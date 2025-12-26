@@ -41,7 +41,18 @@ namespace fileManager.Api.Services
         public async Task<ResponseDto<List<PersonalDocsDTO>>> Add(AddPersonalDocsWithFileDTO form)
         {
             if (form.Files == null || !form.Files.Any())
-                return new ResponseDto<List<PersonalDocsDTO>>("No file uploaded.");                             
+                return new ResponseDto<List<PersonalDocsDTO>>("No file uploaded.");
+
+            // 🔴 تحويل أسماء الملفات القادمة من JSON إلى List
+            List<string> customFileNames = new();
+
+            if (!string.IsNullOrWhiteSpace(form.FileNames))
+            {
+                customFileNames = System.Text.Json.JsonSerializer
+                    .Deserialize<List<string>>(form.FileNames);
+            }
+
+
 
             string baseFolder = Path.Combine(_env.WebRootPath, "uploads");
             string userFolder = Path.Combine(baseFolder, form.PersonalDataId.ToString());
@@ -50,15 +61,29 @@ namespace fileManager.Api.Services
 
             var resultDocs = new List<PersonalDocsDTO>();
 
-            foreach (var file in form.Files)
+            for (int i = 0; i < form.Files.Count; i++)
             {
+                var file = form.Files[i];
                 if (file == null || file.Length == 0) continue;
 
                 var uploadedAt = DateTime.UtcNow;
 
+                // 🔴 الاسم القادم من الفرونت (إن وجد)
+                string originalName = Path.GetFileNameWithoutExtension(file.FileName);
+                string extension = Path.GetExtension(file.FileName);
+
+                string finalFileName =
+                    (customFileNames != null && customFileNames.Count > i && !string.IsNullOrWhiteSpace(customFileNames[i]))
+                    ? customFileNames[i]
+                    : originalName;
+
+                // تنظيف الاسم من رموز غير مسموحة
+                finalFileName = string.Concat(finalFileName.Split(Path.GetInvalidFileNameChars()));
+
                 string datePart = uploadedAt.ToString("yyyy-MM-ddTHH-mm");
-                string uniqueFileName = $"{datePart}_{file.FileName}";
-                string filePath = Path.Combine(userFolder, uniqueFileName);
+                string storedFileName = $"{datePart}_{finalFileName}{extension}";
+
+                string filePath = Path.Combine(userFolder, storedFileName);
 
                 using (var stream = new FileStream(filePath, FileMode.Create))
                 {
@@ -68,19 +93,21 @@ namespace fileManager.Api.Services
                 var personalDoc = new PersonalDocument
                 {
                     PersonalDataId = form.PersonalDataId,
-                    FileName = file.FileName,
-                    FilePath = $"/uploads/{form.PersonalDataId}/{uniqueFileName}",
-                    UploadedAt = DateTime.UtcNow
+
+                    // 🔴 الاسم النهائي (المعدل أو الأصلي)
+                    FileName = $"{finalFileName}{extension}",
+
+                    FilePath = $"/uploads/{form.PersonalDataId}/{storedFileName}",
+                    UploadedAt = uploadedAt
                 };
 
                 await _Wrapper.PersonalDocsRepo.Insert(personalDoc);
                 resultDocs.Add(personalDoc.Adapt<PersonalDocsDTO>());
             }
 
+
             await _Wrapper.SaveAllAsync();
             return new ResponseDto<List<PersonalDocsDTO>>(resultDocs);
-
-            //return new ResponseDto<PersonalDocsDTO>(doc.Adapt<PersonalDocsDTO>());
         }
 
         public async Task<ResponseDto<List<PersonalDocsDTO>>> GetByUser(int personalDataId)
