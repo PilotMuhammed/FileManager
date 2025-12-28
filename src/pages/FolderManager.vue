@@ -3,17 +3,21 @@
         <v-row>
             <v-col cols="12" md="9">
                 <div class="files-preview-grid" @dragover.prevent="onDragOver" @drop.prevent="onDrop">
-                    <div v-for="(file, idx) in uploadedFiles" :key="file.isServerFile ? file.id : 'local-' + idx" class="preview-item">
+                    <div v-for="(file, idx) in uploadedFiles" :key="file.isServerFile ? file.id : 'local-' + idx"
+                        class="preview-item">
                         <img v-if="file.previewUrl && file.type.startsWith('image/')" :src="file.previewUrl"
                             class="preview-img" :alt="file.name" />
                         <v-icon v-else size="100" color="primary" class="pdf-icon">mdi-file-pdf-box</v-icon>
-                        <v-btn icon class="delete-btn" color="error" @click="removeFile(idx)">
-                            <v-icon>mdi-close</v-icon>
-                        </v-btn>
-                        <!-- هنا الإضافة الجديدة: حقل تعديل اسم الملف فقط للملفات المحلية -->
+                        <div class="action-btns">
+                            <v-btn icon class="delete-btn" color="error" @click="removeFile(idx)">
+                                <v-icon>mdi-close</v-icon>
+                            </v-btn>
+                            <v-btn icon class="edit-btn" color="primary" @click="openEditDialog(file, idx)">
+                                <v-icon>mdi-pencil</v-icon>
+                            </v-btn>
+                        </div>
                         <v-text-field v-if="!file.isServerFile" v-model="file.name" label="تعديل اسم الملف" dense
                             hide-details class="rename-input" @keydown.enter.prevent :disabled="uploading" />
-                        <!-- عرض اسم الملف فقط للملفات من السيرفر (غير قابلة للتعديل) -->
                         <div v-else class="file-name mt-2">{{ file.name }}</div>
                     </div>
                 </div>
@@ -32,12 +36,14 @@
             </v-col>
         </v-row>
     </v-container>
+
+    <EditImageDialog v-model="editDialog" :image="editImageUrl" @save="handleImageEdit" />
+
 </template>
 
 <script lang="ts" setup>
 import { uploadUserFiles, getUserFiles, deleteUserFile } from "../api/folderManagerService";
 import { useRoute } from "vue-router";
-
 import { onMounted, onUnmounted, ref } from 'vue';
 
 // Start Service API
@@ -195,6 +201,28 @@ async function removeFile(idx: number) {
     uploadedFiles.value.splice(idx, 1);
 }
 
+// Edit Image
+import EditImageDialog from '../components/EditImageDialog.vue';
+const editDialog = ref(false);
+const editImageUrl = ref<string | null>(null);
+const editFileIndex = ref<number | null>(null);
+const editImageBlob = ref<Blob | null>(null);
+
+function openEditDialog(file: UploadedFile, idx: number) {
+    if (!file.type.startsWith("image/")) return;
+    editImageUrl.value = file.previewUrl;
+    editFileIndex.value = idx;
+    editDialog.value = true;
+}
+
+function handleImageEdit({ url, blob }) {
+    if (editFileIndex.value !== null) {
+        uploadedFiles.value[editFileIndex.value].previewUrl = url;
+        uploadedFiles.value[editFileIndex.value].file = new File([blob], uploadedFiles.value[editFileIndex.value].name, { type: blob.type });
+    }
+    editDialog.value = false;
+}
+
 
 </script>
 
@@ -237,14 +265,33 @@ async function removeFile(idx: number) {
     margin: auto;
 }
 
-.delete-btn {
+.action-btns {
     position: absolute;
-    top: 5px;
-    left: 5px;
+    top: 8px;
+    left: 8px;
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    z-index: 2;
+}
+
+.delete-btn,
+.edit-btn {
     background: #f44336dd;
     color: #fff;
-    z-index: 2;
     border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    box-shadow: 0 2px 8px #0001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.edit-btn {
+    background: #60b3faee;
+    color: #fff;
+    margin-left: 0 !important;
 }
 
 .upload-sidebar {
@@ -327,6 +374,7 @@ async function removeFile(idx: number) {
     background: #f6faff;
     border-radius: 6px;
 }
+
 .file-name {
     position: absolute;
     bottom: 8px;
@@ -340,5 +388,4 @@ async function removeFile(idx: number) {
     border-radius: 6px;
     padding: 4px 0;
 }
-
 </style>
