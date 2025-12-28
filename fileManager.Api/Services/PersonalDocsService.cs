@@ -24,7 +24,6 @@ namespace fileManager.Api.Services
             #region Apply Filter
             var query = _Wrapper.PersonalDocsRepo.GetAll()
                 .Where(d => string.IsNullOrEmpty(filter.FileName) || d.FileName.ToLower().Contains(filter.FileName.ToLower()));
-                //.Where(d => string.IsNullOrEmpty(filter.FilePath) || d.FilePath.ToLower().Contains(filter.FilePath.ToLower()))
             #endregion
             var data = await query
                 .OrderByDescending(d => d.CreatedAt)
@@ -43,7 +42,6 @@ namespace fileManager.Api.Services
             if (form.Files == null || !form.Files.Any())
                 return new ResponseDto<List<PersonalDocsDTO>>("No file uploaded.");
 
-            // 🔴 تحويل أسماء الملفات القادمة من JSON إلى List
             List<string> customFileNames = new();
 
             if (!string.IsNullOrWhiteSpace(form.FileNames))
@@ -68,7 +66,6 @@ namespace fileManager.Api.Services
 
                 var uploadedAt = DateTime.UtcNow;
 
-                // 🔴 الاسم القادم من الفرونت (إن وجد)
                 string originalName = Path.GetFileNameWithoutExtension(file.FileName);
                 string extension = Path.GetExtension(file.FileName);
 
@@ -77,7 +74,6 @@ namespace fileManager.Api.Services
                     ? customFileNames[i]
                     : originalName;
 
-                // تنظيف الاسم من رموز غير مسموحة
                 finalFileName = string.Concat(finalFileName.Split(Path.GetInvalidFileNameChars()));
 
                 string datePart = uploadedAt.ToString("yyyy-MM-ddTHH-mm");
@@ -94,7 +90,6 @@ namespace fileManager.Api.Services
                 {
                     PersonalDataId = form.PersonalDataId,
 
-                    // 🔴 الاسم النهائي (المعدل أو الأصلي)
                     FileName = $"{finalFileName}{extension}",
 
                     FilePath = $"/uploads/{form.PersonalDataId}/{storedFileName}",
